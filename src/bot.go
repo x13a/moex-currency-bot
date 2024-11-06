@@ -16,9 +16,12 @@ import (
 	tele "gopkg.in/telebot.v4"
 )
 
-const EnvBotToken = "BOT_TOKEN"
-const RateDP = 4
-const Dunno = "¯\\_(ツ)_/¯"
+const (
+	EnvBotToken = "BOT_TOKEN"
+	RateDP      = 4
+	Dunno       = `¯\_(ツ)_/¯`
+	CmdGet      = "/get"
+)
 
 func getEnvBotToken() string {
 	token := os.Getenv(EnvBotToken)
@@ -46,6 +49,13 @@ func botRun(
 	if err != nil {
 		log.Fatal(err)
 	}
+	err = b.SetCommands(tele.Command{
+		Text:        CmdGet[1:],
+		Description: "Get Rates",
+	})
+	if err != nil {
+		log.Println(err)
+	}
 	b.Use(PrivateMiddleware(cfg))
 	b.Handle("/start", func(c tele.Context) error {
 		return c.Send(cfg.Bot.WelcomeMsg)
@@ -58,7 +68,7 @@ func botRun(
 		}
 		return c.Send(strconv.FormatInt(chatId, 10))
 	})
-	b.Handle("/get", func(c tele.Context) error {
+	b.Handle(CmdGet, func(c tele.Context) error {
 		type Result struct {
 			ticker string
 			bid    string
@@ -97,11 +107,11 @@ func botRun(
 		sort.Slice(arrRes, func(i, j int) bool {
 			return arrRes[i].ticker < arrRes[j].ticker
 		})
-		arr := make([]string, len(arrRes))
-		for i, v := range arrRes {
-			arr[i] = fmt.Sprintf("%-*s | %-*s | %s", bidWidth, v.bid, askWidth, v.ask, v.ticker)
+		var buf strings.Builder
+		for _, v := range arrRes {
+			buf.WriteString(fmt.Sprintf("%-*s | %-*s | %s\n", bidWidth, v.bid, askWidth, v.ask, v.ticker))
 		}
-		s := strings.Join(arr, "\n")
+		s := strings.TrimSuffix(buf.String(), "\n")
 		if len(s) == 0 {
 			return c.Send(Dunno)
 		}

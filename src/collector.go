@@ -83,7 +83,7 @@ func collect(
 		return
 	}
 	for _, currency := range currencies.Instruments {
-		// TODO checks
+		// TODO filter
 		status, err := mdClient.GetTradingStatus(currency.Figi)
 		if err != nil {
 			log.Println(err)
