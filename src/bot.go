@@ -7,6 +7,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	tele "gopkg.in/telebot.v4"
@@ -27,9 +28,11 @@ func getEnvBotToken() string {
 
 func botRun(
 	ctx context.Context,
+	wg *sync.WaitGroup,
 	db *Database,
 	cfg *Config,
 ) {
+	defer wg.Done()
 	pref := tele.Settings{
 		Token:     getEnvBotToken(),
 		Poller:    &tele.LongPoller{Timeout: 10 * time.Second},
@@ -91,7 +94,9 @@ func botRun(
 		}
 		return c.Send(codeInline(s))
 	})
-	b.Start()
+	go b.Start()
+	defer b.Stop()
+	<-ctx.Done()
 }
 
 func codeInline(s string) string {

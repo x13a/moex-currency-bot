@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -46,19 +47,22 @@ type Rate struct {
 
 func collectLoop(
 	ctx context.Context,
+	wg *sync.WaitGroup,
 	db *Database,
 	cfg *Config,
 ) {
+	defer wg.Done()
 	client := newClient(ctx)
 	defer client.Stop()
 	instClient := client.NewInstrumentsServiceClient()
 	mdClient := client.NewMarketDataServiceClient()
+loop:
 	for {
 		collect(instClient, mdClient, db)
 		select {
 		case <-time.After(time.Duration(cfg.Bot.UpdateInterval) * time.Second):
 		case <-ctx.Done():
-			break
+			break loop
 		}
 	}
 }
