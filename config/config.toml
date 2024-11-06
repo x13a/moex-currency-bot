@@ -1,10 +1,11 @@
 [bot]
-polling = true
-private = true
-users = []
-update_interval = 180
+Polling = true
+Private = true
+Users = []
+UpdateInterval = 180
+WelcomeMsg = "Meow!"
 
 [bot.webhook]
-host = ""
-port = 8000
-cert = "./certs/cert.pem"
+Host = ""
+Port = 8000
+Cert = "./certs/cert.pem"

@@ -40,7 +40,7 @@ func botRun(
 		log.Fatal(err)
 	}
 	b.Handle("/start", func(c tele.Context) error {
-		return c.Send("Meow!")
+		return c.Send(cfg.Bot.WelcomeMsg)
 	})
 	b.Handle("/get", func(c tele.Context) error {
 		type Result struct {

@@ -74,10 +74,18 @@ func collect(
 		return
 	}
 	for _, currency := range currencies.Instruments {
+		status, err := mdClient.GetTradingStatus(currency.Figi)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		if status.TradingStatus != pb.SecurityTradingStatus_SECURITY_TRADING_STATUS_NORMAL_TRADING {
+			continue
+		}
 		orderBook, err := mdClient.GetOrderBook(currency.Figi, 1)
 		if err != nil {
 			log.Println(err)
-			return
+			continue
 		}
 		rate := &Rate{}
 		nominal := toDecimal(currency.Nominal.Units, currency.Nominal.Nano)
@@ -99,6 +107,5 @@ func collect(
 			rate.Ask = &askDec
 		}
 		db.Set(currency.Ticker, *rate)
-		time.Sleep(1 * time.Second)
 	}
 }

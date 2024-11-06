@@ -15,10 +15,11 @@ type Config struct {
 		Private        bool
 		Users          []string
 		UpdateInterval int
+		WelcomeMsg     string
 		Webhook        struct {
-			host string
-			port int
-			cert string
+			Host string
+			Port int
+			Cert string
 		}
 	}
 }
