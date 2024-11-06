@@ -40,8 +40,8 @@ func newClient(ctx context.Context) *investgo.Client {
 }
 
 type Rate struct {
-	Buy  *decimal.Decimal
-	Sell *decimal.Decimal
+	Bid *decimal.Decimal
+	Ask *decimal.Decimal
 }
 
 func collectLoop(
@@ -84,19 +84,19 @@ func collect(
 		useNominal := nominal.GreaterThan(decimal.NewFromFloat(1.0))
 		if len(orderBook.Bids) != 0 {
 			bid := orderBook.Bids[0]
-			sell := toDecimal(bid.Price.Units, bid.Price.Nano)
+			bidDec := toDecimal(bid.Price.Units, bid.Price.Nano)
 			if useNominal {
-				sell = nominal.Div(sell)
+				bidDec = nominal.Div(bidDec)
 			}
-			rate.Sell = &sell
+			rate.Bid = &bidDec
 		}
 		if len(orderBook.Asks) != 0 {
 			ask := orderBook.Asks[0]
-			buy := toDecimal(ask.Price.Units, ask.Price.Nano)
+			askDec := toDecimal(ask.Price.Units, ask.Price.Nano)
 			if useNominal {
-				buy = nominal.Div(buy)
+				askDec = nominal.Div(askDec)
 			}
-			rate.Buy = &buy
+			rate.Ask = &askDec
 		}
 		db.Set(currency.Ticker, *rate)
 		time.Sleep(1 * time.Second)

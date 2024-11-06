@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 
 const EnvBotToken = "BOT_TOKEN"
 const RateDP = 4
+const Dunno = "¯\\_(ツ)_/¯"
 
 func getEnvBotToken() string {
 	token := os.Getenv(EnvBotToken)
@@ -37,26 +39,61 @@ func botRun(
 	if err != nil {
 		log.Fatal(err)
 	}
+	b.Handle("/start", func(c tele.Context) error {
+		return c.Send("Meow!")
+	})
 	b.Handle("/get", func(c tele.Context) error {
+		type Result struct {
+			ticker string
+			bid    string
+			ask    string
+		}
+
 		data := db.GetAll()
-		arr := make([]string, len(data))
+		arrRes := make([]Result, len(data))
 		idx := 0
+		bidWidth := 0
+		askWidth := 0
 		for k, v := range data {
-			var buy string
-			if v.Buy != nil {
-				buy = v.Buy.StringFixed(RateDP)
+			var bid string
+			if v.Bid != nil {
+				bid = v.Bid.StringFixed(RateDP)
+				bid = strings.TrimRight(bid, ".0")
+				bidWidth = max(bidWidth, len(bid))
 			}
-			var sell string
-			if v.Sell != nil {
-				sell = v.Sell.StringFixed(RateDP)
+			var ask string
+			if v.Ask != nil {
+				ask = v.Ask.StringFixed(RateDP)
+				ask = strings.TrimRight(ask, ".0")
+				askWidth = max(askWidth, len(ask))
 			}
-			if buy == "" && sell == "" {
+			if bid == "" && ask == "" {
 				continue
 			}
-			arr[idx] = fmt.Sprintf("%-9s | %-9s | %s", buy, sell, k)
+			arrRes[idx] = Result{
+				ticker: k,
+				bid:    bid,
+				ask:    ask,
+			}
 			idx++
 		}
-		return c.Send(fmt.Sprintf("<code>%s</code>", strings.Join(arr, "\n")))
+		arrRes = arrRes[:idx]
+		sort.Slice(arrRes, func(i, j int) bool {
+			return arrRes[i].ticker < arrRes[j].ticker
+		})
+		arr := make([]string, len(arrRes))
+		for i, v := range arrRes {
+			arr[i] = fmt.Sprintf("%-*s | %-*s | %s", bidWidth, v.bid, askWidth, v.ask, v.ticker)
+		}
+		s := strings.Join(arr, "\n")
+		if len(s) == 0 {
+			return c.Send(Dunno)
+		}
+		return c.Send(codeInline(s))
 	})
 	b.Start()
+}
+
+func codeInline(s string) string {
+	return fmt.Sprintf("<code>%s</code>", s)
 }
