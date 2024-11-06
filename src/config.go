@@ -13,7 +13,7 @@ type Config struct {
 	Bot struct {
 		Polling        bool
 		Private        bool
-		Users          []string
+		ChatIds        []int64
 		UpdateInterval int
 		WelcomeMsg     string
 		Webhook        struct {

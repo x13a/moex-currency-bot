@@ -1,7 +1,7 @@
 [bot]
 Polling = true
 Private = true
-Users = []
+ChatIds = []
 UpdateInterval = 180
 WelcomeMsg = "Welcome!"
 

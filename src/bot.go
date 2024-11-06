@@ -8,6 +8,7 @@ import (
 	"os"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -48,6 +49,14 @@ func botRun(
 	b.Use(PrivateMiddleware(cfg))
 	b.Handle("/start", func(c tele.Context) error {
 		return c.Send(cfg.Bot.WelcomeMsg)
+	})
+	b.Handle("/id", func(c tele.Context) error {
+		chatId := int64(0)
+		chat := c.Chat()
+		if chat != nil {
+			chatId = chat.ID
+		}
+		return c.Send(strconv.FormatInt(chatId, 10))
 	})
 	b.Handle("/get", func(c tele.Context) error {
 		type Result struct {
@@ -113,15 +122,15 @@ func PrivateMiddleware(cfg *Config) tele.MiddlewareFunc {
 			if !cfg.Bot.Private {
 				return next(c)
 			}
-			user := c.Sender()
-			if user == nil {
+			chat := c.Chat()
+			if chat == nil {
 				return nil
 			}
-			username := user.Username
-			if username == "" {
+			chatId := chat.ID
+			if chatId == 0 {
 				return nil
 			}
-			if slices.Contains(cfg.Bot.Users, username) {
+			if slices.Contains(cfg.Bot.ChatIds, chatId) {
 				return next(c)
 			}
 			return nil
