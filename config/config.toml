@@ -3,7 +3,7 @@ Polling = true
 Private = true
 Users = []
 UpdateInterval = 180
-WelcomeMsg = "Meow!"
+WelcomeMsg = "Welcome!"
 
 [bot.webhook]
 Host = ""

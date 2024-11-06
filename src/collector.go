@@ -53,7 +53,12 @@ func collectLoop(
 ) {
 	defer wg.Done()
 	client := newClient(ctx)
-	defer client.Stop()
+	defer func() {
+		err := client.Stop()
+		if err != nil {
+			log.Println(err)
+		}
+	}()
 	instClient := client.NewInstrumentsServiceClient()
 	mdClient := client.NewMarketDataServiceClient()
 loop:
@@ -72,12 +77,13 @@ func collect(
 	mdClient *investgo.MarketDataServiceClient,
 	db *Database,
 ) {
-	currencies, err := instClient.Currencies(pb.InstrumentStatus_INSTRUMENT_STATUS_UNSPECIFIED)
+	currencies, err := instClient.Currencies(pb.InstrumentStatus_INSTRUMENT_STATUS_ALL)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 	for _, currency := range currencies.Instruments {
+		// TODO checks
 		status, err := mdClient.GetTradingStatus(currency.Figi)
 		if err != nil {
 			log.Println(err)

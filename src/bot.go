@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"html"
 	"log"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -33,6 +35,7 @@ func botRun(
 	cfg *Config,
 ) {
 	defer wg.Done()
+	// TODO webhook
 	pref := tele.Settings{
 		Token:     getEnvBotToken(),
 		Poller:    &tele.LongPoller{Timeout: 10 * time.Second},
@@ -42,6 +45,7 @@ func botRun(
 	if err != nil {
 		log.Fatal(err)
 	}
+	b.Use(PrivateMiddleware(cfg))
 	b.Handle("/start", func(c tele.Context) error {
 		return c.Send(cfg.Bot.WelcomeMsg)
 	})
@@ -100,5 +104,27 @@ func botRun(
 }
 
 func codeInline(s string) string {
-	return fmt.Sprintf("<code>%s</code>", s)
+	return fmt.Sprintf("<code>%s</code>", html.EscapeString(s))
+}
+
+func PrivateMiddleware(cfg *Config) tele.MiddlewareFunc {
+	return func(next tele.HandlerFunc) tele.HandlerFunc {
+		return func(c tele.Context) error {
+			if !cfg.Bot.Private {
+				return next(c)
+			}
+			user := c.Sender()
+			if user == nil {
+				return nil
+			}
+			username := user.Username
+			if username == "" {
+				return nil
+			}
+			if slices.Contains(cfg.Bot.Users, username) {
+				return next(c)
+			}
+			return nil
+		}
+	}
 }

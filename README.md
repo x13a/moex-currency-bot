@@ -1,6 +1,6 @@
 # moex-currency-bot
 
-MoEx currency exchange rates telegram bot.
+MOEX currency exchange rates telegram bot.
 
 ## Setup
 
