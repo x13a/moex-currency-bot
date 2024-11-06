@@ -1,0 +1,10 @@
+services:
+  bot:
+    build: .
+    image: 'moex-currency-bot'
+    container_name: 'moex-currency-bot'
+    restart: unless-stopped
+    env_file:
+      - './config/bot.env'
+    volumes:
+      - './config/config.toml:/config/config.toml:ro'

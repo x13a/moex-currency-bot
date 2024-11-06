@@ -1,0 +1,10 @@
+[bot]
+polling = true
+private = true
+users = []
+update_interval = 180
+
+[bot.webhook]
+host = ""
+port = 8000
+cert = "./certs/cert.pem"
