@@ -21,8 +21,9 @@ const (
 	EnvBotToken = "BOT_TOKEN"
 	RateDP      = 4
 	Dunno       = `¯\_(ツ)_/¯`
-	CmdGet      = "/get"
-	CmdGetConv  = "/getconv"
+	
+	CmdGet     = "/get"
+	CmdGetConv = "/getconv"
 )
 
 func getEnvBotToken() string {
