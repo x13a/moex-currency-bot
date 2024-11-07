@@ -128,7 +128,6 @@ func getHandler(db *Database, conv bool) tele.HandlerFunc {
 			if conv && !hasNominal {
 				continue
 			}
-			bidLen := 0
 			bid := ""
 			if v.Bid != nil {
 				if conv {
@@ -138,10 +137,8 @@ func getHandler(db *Database, conv bool) tele.HandlerFunc {
 				bid = v.Bid.StringFixed(RateDP)
 				bid = strings.TrimRight(bid, "0")
 				bid = strings.TrimSuffix(bid, ".")
-				bidLen = len(bid)
 			}
 			ask := ""
-			askLen := 0
 			if v.Ask != nil {
 				if conv {
 					ask := v.Nominal.Div(*v.Ask)
@@ -150,15 +147,13 @@ func getHandler(db *Database, conv bool) tele.HandlerFunc {
 				ask = v.Ask.StringFixed(RateDP)
 				ask = strings.TrimRight(ask, "0")
 				ask = strings.TrimSuffix(ask, ".")
-				askLen = len(ask)
 			}
 			if bid == "" && ask == "" {
 				continue
 			}
-			bidWidth = max(bidLen, bidWidth)
-			askWidth = max(askLen, askWidth)
+			bidWidth = max(len(bid), bidWidth)
+			askWidth = max(len(ask), askWidth)
 			if conv {
-				bidWidth, askWidth = askWidth, bidWidth
 				bid, ask = ask, bid
 			} else if hasNominal {
 				k += "*"
@@ -174,6 +169,9 @@ func getHandler(db *Database, conv bool) tele.HandlerFunc {
 		sort.Slice(arrRes, func(i, j int) bool {
 			return arrRes[i].ticker < arrRes[j].ticker
 		})
+		if conv {
+			bidWidth, askWidth = askWidth, bidWidth
+		}
 		var buf strings.Builder
 		for _, v := range arrRes {
 			buf.WriteString(fmt.Sprintf("%-*s | %-*s | %s\n", bidWidth, v.bid, askWidth, v.ask, v.ticker))
