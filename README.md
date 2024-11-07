@@ -2,6 +2,9 @@
 
 MOEX currency exchange rates telegram bot.
 
+<img width="318" alt="" src="https://github.com/user-attachments/assets/01a14c5e-b3f5-4d50-aa8e-769dd58874c4">
+
+
 ## Setup
 
 ```shell
