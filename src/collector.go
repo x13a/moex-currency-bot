@@ -62,13 +62,12 @@ func collectLoop(
 	}()
 	instClient := client.NewInstrumentsServiceClient()
 	mdClient := client.NewMarketDataServiceClient()
-loop:
 	for {
 		collect(instClient, mdClient, db)
 		select {
 		case <-time.After(time.Duration(cfg.Bot.UpdateInterval) * time.Second):
 		case <-ctx.Done():
-			break loop
+			return
 		}
 	}
 }
