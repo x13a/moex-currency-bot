@@ -63,7 +63,7 @@ func botRun(
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = b.SetCommands([]tele.Command{
+	cmds := []tele.Command{
 		{
 			Text:        CmdGet[1:],
 			Description: "Get Rates",
@@ -72,13 +72,21 @@ func botRun(
 			Text:        CmdGetConv[1:],
 			Description: "Get Rates Conv",
 		},
-	})
+	}
+	err = b.SetCommands(cmds)
 	if err != nil {
 		log.Println(err)
 	}
 	b.Use(PrivateMiddleware(cfg))
 	b.Handle("/start", func(c tele.Context) error {
 		return c.Send(cfg.Bot.WelcomeMsg)
+	})
+	b.Handle("/help", func(c tele.Context) error {
+		var buf strings.Builder
+		for _, cmd := range cmds {
+			buf.WriteString(fmt.Sprintf("/%s - %s\n", cmd.Text, cmd.Description))
+		}
+		return c.Send(buf.String())
 	})
 	b.Handle("/id", func(c tele.Context) error {
 		chatId := int64(0)
