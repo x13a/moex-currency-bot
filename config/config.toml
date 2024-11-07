@@ -2,7 +2,7 @@
 Polling = true
 Private = true
 ChatIds = []
-UpdateInterval = 180
+UpdateInterval = 60
 WelcomeMsg = "Welcome!"
 
 [bot.webhook]
