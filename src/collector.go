@@ -65,7 +65,7 @@ func collectLoop(
 	for {
 		collect(instClient, mdClient, db)
 		select {
-		case <-time.After(time.Duration(cfg.Bot.UpdateInterval) * time.Second):
+		case <-time.After(cfg.Bot.UpdateInterval * time.Second):
 		case <-ctx.Done():
 			return
 		}

@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	tele "gopkg.in/telebot.v4"
 )
@@ -42,11 +43,21 @@ func botRun(
 	cfg *Config,
 ) {
 	defer wg.Done()
-	// TODO webhook
 	pref := tele.Settings{
 		Token:     getEnvBotToken(),
-		Poller:    &tele.LongPoller{Timeout: 10 * time.Second},
 		ParseMode: tele.ModeHTML,
+	}
+	if cfg.Bot.Polling {
+		pref.Poller = &tele.LongPoller{Timeout: cfg.Bot.PollingTimeout * time.Second}
+	} else {
+		pref.Poller = &tele.Webhook{
+			Listen:      fmt.Sprintf("0.0.0.0:%d", cfg.Bot.Webhook.Port),
+			SecretToken: uuid.New().String(),
+			Endpoint: &tele.WebhookEndpoint{
+				PublicURL: cfg.Bot.Webhook.Url,
+				Cert:      cfg.Bot.Webhook.Cert,
+			},
+		}
 	}
 	b, err := tele.NewBot(pref)
 	if err != nil {

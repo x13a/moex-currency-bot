@@ -1,11 +1,12 @@
 [bot]
 Polling = true
+PollingTimeout = 10
 Private = true
 ChatIds = []
 UpdateInterval = 60
 WelcomeMsg = "Welcome!"
 
 [bot.webhook]
-Host = ""
+Url = "https://<HOST>/moex-currency-bot/webhook/"
 Port = 8000
 Cert = "./certs/cert.pem"

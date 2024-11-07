@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
 	"github.com/BurntSushi/toml"
 )
@@ -12,13 +13,14 @@ const EnvBotConfig = "BOT_CONFIG"
 type Config struct {
 	Bot struct {
 		Polling        bool
+		PollingTimeout time.Duration
 		Private        bool
 		ChatIds        []int64
-		UpdateInterval int
+		UpdateInterval time.Duration
 		WelcomeMsg     string
 		Webhook        struct {
-			Host string
-			Port int
+			Url  string
+			Port uint16
 			Cert string
 		}
 	}
