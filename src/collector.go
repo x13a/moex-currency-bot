@@ -41,8 +41,9 @@ func newClient(ctx context.Context) *investgo.Client {
 }
 
 type Rate struct {
-	Bid *decimal.Decimal
-	Ask *decimal.Decimal
+	Nominal decimal.Decimal
+	Bid     *decimal.Decimal
+	Ask     *decimal.Decimal
 }
 
 func collectLoop(
@@ -83,13 +84,7 @@ func collect(
 		return
 	}
 	for _, currency := range currencies.Instruments {
-		// TODO filter
-		status, err := mdClient.GetTradingStatus(currency.Figi)
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-		if status.TradingStatus != pb.SecurityTradingStatus_SECURITY_TRADING_STATUS_NORMAL_TRADING {
+		if currency.TradingStatus != pb.SecurityTradingStatus_SECURITY_TRADING_STATUS_NORMAL_TRADING {
 			continue
 		}
 		orderBook, err := mdClient.GetOrderBook(currency.Figi, 1)
@@ -97,23 +92,17 @@ func collect(
 			log.Println(err)
 			continue
 		}
-		rate := &Rate{}
-		nominal := toDecimal(currency.Nominal.Units, currency.Nominal.Nano)
-		useNominal := nominal.GreaterThan(decimal.NewFromFloat(1.0))
+		rate := &Rate{
+			Nominal: toDecimal(currency.Nominal.Units, currency.Nominal.Nano),
+		}
 		if len(orderBook.Bids) != 0 {
 			bid := orderBook.Bids[0]
 			bidDec := toDecimal(bid.Price.Units, bid.Price.Nano)
-			if useNominal {
-				bidDec = nominal.Div(bidDec)
-			}
 			rate.Bid = &bidDec
 		}
 		if len(orderBook.Asks) != 0 {
 			ask := orderBook.Asks[0]
 			askDec := toDecimal(ask.Price.Units, ask.Price.Nano)
-			if useNominal {
-				askDec = nominal.Div(askDec)
-			}
 			rate.Ask = &askDec
 		}
 		db.Set(currency.Ticker, *rate)

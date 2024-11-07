@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/shopspring/decimal"
 	tele "gopkg.in/telebot.v4"
 )
 
@@ -21,6 +22,7 @@ const (
 	RateDP      = 4
 	Dunno       = `¯\_(ツ)_/¯`
 	CmdGet      = "/get"
+	CmdGetConv  = "/getconv"
 )
 
 func getEnvBotToken() string {
@@ -49,9 +51,15 @@ func botRun(
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = b.SetCommands(tele.Command{
-		Text:        CmdGet[1:],
-		Description: "Get Rates",
+	err = b.SetCommands([]tele.Command{
+		{
+			Text:        CmdGet[1:],
+			Description: "Get Rates",
+		},
+		{
+			Text:        CmdGetConv[1:],
+			Description: "Get Rates Conv",
+		},
 	})
 	if err != nil {
 		log.Println(err)
@@ -68,55 +76,8 @@ func botRun(
 		}
 		return c.Send(strconv.FormatInt(chatId, 10))
 	})
-	b.Handle(CmdGet, func(c tele.Context) error {
-		type Result struct {
-			ticker string
-			bid    string
-			ask    string
-		}
-
-		data := db.GetAll()
-		arrRes := make([]Result, len(data))
-		idx := 0
-		bidWidth := 0
-		askWidth := 0
-		for k, v := range data {
-			var bid string
-			if v.Bid != nil {
-				bid = v.Bid.StringFixed(RateDP)
-				bid = strings.TrimRight(bid, ".0")
-				bidWidth = max(bidWidth, len(bid))
-			}
-			var ask string
-			if v.Ask != nil {
-				ask = v.Ask.StringFixed(RateDP)
-				ask = strings.TrimRight(ask, ".0")
-				askWidth = max(askWidth, len(ask))
-			}
-			if bid == "" && ask == "" {
-				continue
-			}
-			arrRes[idx] = Result{
-				ticker: k,
-				bid:    bid,
-				ask:    ask,
-			}
-			idx++
-		}
-		arrRes = arrRes[:idx]
-		sort.Slice(arrRes, func(i, j int) bool {
-			return arrRes[i].ticker < arrRes[j].ticker
-		})
-		var buf strings.Builder
-		for _, v := range arrRes {
-			buf.WriteString(fmt.Sprintf("%-*s | %-*s | %s\n", bidWidth, v.bid, askWidth, v.ask, v.ticker))
-		}
-		s := strings.TrimSuffix(buf.String(), "\n")
-		if len(s) == 0 {
-			return c.Send(Dunno)
-		}
-		return c.Send(codeInline(s))
-	})
+	b.Handle(CmdGet, getHandler(db, false))
+	b.Handle(CmdGetConv, getHandler(db, true))
 	go b.Start()
 	defer b.Stop()
 	<-ctx.Done()
@@ -145,5 +106,81 @@ func PrivateMiddleware(cfg *Config) tele.MiddlewareFunc {
 			}
 			return nil
 		}
+	}
+}
+
+func getHandler(db *Database, conv bool) tele.HandlerFunc {
+	return func(c tele.Context) error {
+		type Result struct {
+			ticker string
+			bid    string
+			ask    string
+		}
+
+		data := db.GetAll()
+		arrRes := make([]Result, len(data))
+		idx := 0
+		bidWidth := 0
+		askWidth := 0
+		for k, v := range data {
+			hasNominal := v.Nominal.GreaterThan(decimal.NewFromFloat(1.0))
+			if conv && !hasNominal {
+				continue
+			}
+			bidLen := 0
+			bid := ""
+			if v.Bid != nil {
+				if conv {
+					bid := v.Nominal.Div(*v.Bid)
+					v.Bid = &bid
+				}
+				bid = v.Bid.StringFixed(RateDP)
+				bid = strings.TrimRight(bid, "0")
+				bid = strings.TrimSuffix(bid, ".")
+				bidLen = len(bid)
+			}
+			ask := ""
+			askLen := 0
+			if v.Ask != nil {
+				if conv {
+					ask := v.Nominal.Div(*v.Ask)
+					v.Ask = &ask
+				}
+				ask = v.Ask.StringFixed(RateDP)
+				ask = strings.TrimRight(ask, "0")
+				ask = strings.TrimSuffix(ask, ".")
+				askLen = len(ask)
+			}
+			if bid == "" && ask == "" {
+				continue
+			}
+			bidWidth = max(bidLen, bidWidth)
+			askWidth = max(askLen, askWidth)
+			if conv {
+				bidWidth, askWidth = askWidth, bidWidth
+				bid, ask = ask, bid
+			} else if hasNominal {
+				k += "*"
+			}
+			arrRes[idx] = Result{
+				ticker: k,
+				bid:    bid,
+				ask:    ask,
+			}
+			idx++
+		}
+		arrRes = arrRes[:idx]
+		sort.Slice(arrRes, func(i, j int) bool {
+			return arrRes[i].ticker < arrRes[j].ticker
+		})
+		var buf strings.Builder
+		for _, v := range arrRes {
+			buf.WriteString(fmt.Sprintf("%-*s | %-*s | %s\n", bidWidth, v.bid, askWidth, v.ask, v.ticker))
+		}
+		s := strings.TrimSuffix(buf.String(), "\n")
+		if len(s) == 0 {
+			return c.Send(Dunno)
+		}
+		return c.Send(codeInline(s))
 	}
 }
