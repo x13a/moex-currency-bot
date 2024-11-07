@@ -82,6 +82,7 @@ func collect(
 		log.Println(err)
 		return
 	}
+	dbUpdated := false
 	for _, currency := range currencies.Instruments {
 		if currency.TradingStatus != pb.SecurityTradingStatus_SECURITY_TRADING_STATUS_NORMAL_TRADING {
 			continue
@@ -104,6 +105,10 @@ func collect(
 			askDec := toDecimal(ask.Price.Units, ask.Price.Nano)
 			rate.Ask = &askDec
 		}
-		db.Set(currency.Ticker, *rate)
+		db.Data.SetRate(currency.Ticker, *rate)
+		dbUpdated = true
+	}
+	if dbUpdated {
+		db.Cache.Clear()
 	}
 }

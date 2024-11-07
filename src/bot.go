@@ -96,8 +96,8 @@ func botRun(
 		}
 		return c.Send(strconv.FormatInt(chatId, 10))
 	})
-	b.Handle(CmdGet, getHandler(db, false))
-	b.Handle(CmdGetConv, getHandler(db, true))
+	b.Handle(CmdGet, getHandler(db, CmdGet))
+	b.Handle(CmdGetConv, getHandler(db, CmdGetConv))
 	go b.Start()
 	defer b.Stop()
 	<-ctx.Done()
@@ -129,20 +129,26 @@ func PrivateMiddleware(cfg *Config) tele.MiddlewareFunc {
 	}
 }
 
-func getHandler(db *Database, conv bool) tele.HandlerFunc {
+func getHandler(db *Database, cmd string) tele.HandlerFunc {
 	return func(c tele.Context) error {
+		s, ok := db.Cache.Get(cmd)
+		if ok {
+			return c.Send(s)
+		}
+
 		type Result struct {
 			ticker string
 			bid    string
 			ask    string
 		}
 
-		data := db.GetAll()
-		arrRes := make([]Result, len(data))
+		rates := db.Data.GetRates()
+		arrRes := make([]Result, len(rates))
 		idx := 0
 		bidWidth := 0
 		askWidth := 0
-		for k, v := range data {
+		conv := cmd == CmdGetConv
+		for k, v := range rates {
 			hasNominal := v.Nominal.GreaterThan(decimal.NewFromFloat(1.0))
 			if conv && !hasNominal {
 				continue
@@ -195,10 +201,12 @@ func getHandler(db *Database, conv bool) tele.HandlerFunc {
 		for _, v := range arrRes {
 			buf.WriteString(fmt.Sprintf("%-*s | %-*s | %s\n", bidWidth, v.bid, askWidth, v.ask, v.ticker))
 		}
-		s := strings.TrimSuffix(buf.String(), "\n")
+		s = strings.TrimSuffix(buf.String(), "\n")
 		if len(s) == 0 {
 			return c.Send(Dunno)
 		}
-		return c.Send(codeInline(s))
+		s = codeInline(s)
+		db.Cache.Set(cmd, s)
+		return c.Send(s)
 	}
 }
