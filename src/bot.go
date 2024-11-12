@@ -28,7 +28,7 @@ const (
 	CmdValToday = "/valtoday"
 )
 
-func getEnvBotToken() string {
+func mustGetEnvBotToken() string {
 	token := os.Getenv(EnvBotToken)
 	if token == "" {
 		log.Fatal("empty bot token")
@@ -37,7 +37,7 @@ func getEnvBotToken() string {
 	return token
 }
 
-func botRun(
+func runBot(
 	ctx context.Context,
 	wg *sync.WaitGroup,
 	db *Database,
@@ -45,7 +45,7 @@ func botRun(
 ) {
 	defer wg.Done()
 	pref := tele.Settings{
-		Token:     getEnvBotToken(),
+		Token:     mustGetEnvBotToken(),
 		ParseMode: tele.ModeHTML,
 	}
 	if cfg.Bot.Polling {

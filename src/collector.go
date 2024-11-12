@@ -26,7 +26,7 @@ func toDecimal(units int64, nano int32) decimal.Decimal {
 	return decimal.RequireFromString(fmt.Sprintf("%d.%d", units, nano))
 }
 
-func getEnvTinkoffToken() string {
+func mustGetEnvTinkoffToken() string {
 	token := os.Getenv(EnvTinkoffToken)
 	if token == "" {
 		log.Fatal("empty tinkoff token")
@@ -37,7 +37,7 @@ func getEnvTinkoffToken() string {
 
 func newClient(ctx context.Context) *investgo.Client {
 	tinkoffConfig := investgo.Config{
-		Token: getEnvTinkoffToken(),
+		Token: mustGetEnvTinkoffToken(),
 	}
 	logger := &Logger{}
 	client, err := investgo.NewClient(ctx, tinkoffConfig, logger)

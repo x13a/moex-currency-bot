@@ -28,7 +28,7 @@ type Config struct {
 	}
 }
 
-func loadConfig() *Config {
+func mustLoadConfig() *Config {
 	config := &Config{}
 	if _, err := toml.DecodeFile(os.Getenv(EnvBotConfig), config); err != nil {
 		log.Fatal(err)
