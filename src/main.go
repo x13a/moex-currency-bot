@@ -13,8 +13,10 @@ func main() {
 	defer cancel()
 	db := NewDatabase()
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(3)
 	go botRun(ctx, &wg, db, cfg)
-	go collectLoop(ctx, &wg, db, cfg)
+	waitChan := make(chan struct{}, 1)
+	go collectRatesLoop(ctx, &wg, db, cfg, waitChan)
+	go collectMoexIssLoop(ctx, &wg, db, cfg, waitChan)
 	wg.Wait()
 }

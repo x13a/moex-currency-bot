@@ -8,24 +8,42 @@ type Database struct {
 }
 
 type Data struct {
-	mu    sync.RWMutex
-	rates map[string]Rate
+	muRates sync.RWMutex
+	muMoex  sync.RWMutex
+	rates   map[string]Rate
+	moex    map[string]MoexInstrument
 }
 
 func (d *Data) SetRate(key string, rate Rate) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+	d.muRates.Lock()
+	defer d.muRates.Unlock()
 	d.rates[key] = rate
 }
 
 func (d *Data) GetRates() map[string]Rate {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
+	d.muRates.RLock()
+	defer d.muRates.RUnlock()
 	rates := make(map[string]Rate, len(d.rates))
 	for k, v := range d.rates {
 		rates[k] = v
 	}
 	return rates
+}
+
+func (d *Data) SetInstrument(key string, value MoexInstrument) {
+	d.muMoex.Lock()
+	defer d.muMoex.Unlock()
+	d.moex[key] = value
+}
+
+func (d *Data) GetInstruments() map[string]MoexInstrument {
+	d.muMoex.RLock()
+	defer d.muMoex.RUnlock()
+	res := make(map[string]MoexInstrument, len(d.moex))
+	for k, v := range d.moex {
+		res[k] = v
+	}
+	return res
 }
 
 type Cache struct {
@@ -46,15 +64,25 @@ func (c *Cache) Get(key string) (string, bool) {
 	return v, ok
 }
 
-func (c *Cache) Clear() {
+func (c *Cache) ClearGet() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.data = make(map[string]string)
+	delete(c.data, CmdGet)
+	delete(c.data, CmdGetConv)
+}
+
+func (c *Cache) ClearValToday() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.data, CmdValToday)
 }
 
 func NewDatabase() *Database {
 	return &Database{
-		Data:  &Data{rates: make(map[string]Rate)},
+		Data: &Data{
+			rates: make(map[string]Rate),
+			moex:  make(map[string]MoexInstrument),
+		},
 		Cache: &Cache{data: make(map[string]string)},
 	}
 }

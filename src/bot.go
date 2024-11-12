@@ -23,16 +23,17 @@ const (
 	RateDP      = 4
 	Dunno       = `¯\_(ツ)_/¯`
 
-	CmdGet     = "/get"
-	CmdGetConv = "/getconv"
+	CmdGet      = "/get"
+	CmdGetConv  = "/getconv"
+	CmdValToday = "/valtoday"
 )
 
 func getEnvBotToken() string {
 	token := os.Getenv(EnvBotToken)
-	_ = os.Unsetenv(EnvBotToken)
 	if token == "" {
 		log.Fatal("empty bot token")
 	}
+	_ = os.Unsetenv(EnvBotToken)
 	return token
 }
 
@@ -72,9 +73,12 @@ func botRun(
 			Text:        CmdGetConv[1:],
 			Description: "Get Rates Conv",
 		},
+		{
+			Text:        CmdValToday[1:],
+			Description: "Get Value Today",
+		},
 	}
-	err = b.SetCommands(cmds)
-	if err != nil {
+	if err = b.SetCommands(cmds); err != nil {
 		log.Println(err)
 	}
 	b.Use(PrivateMiddleware(cfg))
@@ -89,13 +93,13 @@ func botRun(
 		return c.Send(buf.String())
 	})
 	b.Handle("/id", func(c tele.Context) error {
-		chatId := int64(0)
-		chat := c.Chat()
-		if chat != nil {
-			chatId = chat.ID
+		chatID := int64(0)
+		if chat := c.Chat(); chat != nil {
+			chatID = chat.ID
 		}
-		return c.Send(strconv.FormatInt(chatId, 10))
+		return c.Send(strconv.FormatInt(chatID, 10))
 	})
+	b.Handle(CmdValToday, valTodayHandler(db))
 	b.Handle(CmdGet, getHandler(db, CmdGet))
 	b.Handle(CmdGetConv, getHandler(db, CmdGetConv))
 	go b.Start()
@@ -117,15 +121,61 @@ func PrivateMiddleware(cfg *Config) tele.MiddlewareFunc {
 			if chat == nil {
 				return nil
 			}
-			chatId := chat.ID
-			if chatId == 0 {
+			chatID := chat.ID
+			if chatID == 0 {
 				return nil
 			}
-			if slices.Contains(cfg.Bot.ChatIds, chatId) {
+			if slices.Contains(cfg.Bot.ChatIDs, chatID) {
 				return next(c)
 			}
 			return nil
 		}
+	}
+}
+
+func valTodayHandler(db *Database) tele.HandlerFunc {
+	return func(c tele.Context) error {
+		s, ok := db.Cache.Get(CmdValToday)
+		if ok {
+			return c.Send(s)
+		}
+
+		type Result struct {
+			ticker   string
+			valToday string
+		}
+
+		instruments := db.Data.GetInstruments()
+		arrRes := make([]Result, len(instruments))
+		idx := 0
+		width := 0
+		for k, v := range instruments {
+			if v.ValToday == 0.0 {
+				continue
+			}
+			res := Result{
+				ticker:   k,
+				valToday: formatFloat64(v.ValToday),
+			}
+			width = max(len(res.valToday), width)
+			arrRes[idx] = res
+			idx++
+		}
+		arrRes = arrRes[:idx]
+		sort.Slice(arrRes, func(i, j int) bool {
+			return arrRes[i].ticker < arrRes[j].ticker
+		})
+		var buf strings.Builder
+		for _, v := range arrRes {
+			buf.WriteString(fmt.Sprintf("%-*s | %s\n", width, v.valToday, v.ticker))
+		}
+		s = strings.TrimSuffix(buf.String(), "\n")
+		if len(s) == 0 {
+			return c.Send(Dunno)
+		}
+		s = codeInline(s)
+		db.Cache.Set(CmdValToday, s)
+		return c.Send(s)
 	}
 }
 
@@ -151,7 +201,13 @@ func getHandler(db *Database, cmd string) tele.HandlerFunc {
 		for k, v := range rates {
 			hasNominal := v.Nominal.GreaterThan(decimal.NewFromFloat(1.0))
 			if conv && !hasNominal {
-				continue
+				switch {
+				case strings.HasPrefix(k, "TRY"):
+				case strings.HasPrefix(k, "BYN"):
+					v.Nominal = decimal.NewFromFloat(100.0)
+				default:
+					continue
+				}
 			}
 			bid := ""
 			if v.Bid != nil {
@@ -209,4 +265,24 @@ func getHandler(db *Database, cmd string) tele.HandlerFunc {
 		db.Cache.Set(cmd, s)
 		return c.Send(s)
 	}
+}
+
+func formatFloat64(f float64) string {
+	s := strconv.FormatFloat(f, 'f', -1, 64)
+	if len(s) <= 3 {
+		return s
+	}
+	numOfComma := (len(s) - 1) / 3
+	res := make([]byte, len(s)+numOfComma)
+	for i, j, k := len(s)-1, len(res)-1, 0; ; i, j = i-1, j-1 {
+		res[j] = s[i]
+		if i == 0 {
+			break
+		}
+		if k++; k == 3 {
+			j, k = j-1, 0
+			res[j] = ','
+		}
+	}
+	return string(res)
 }

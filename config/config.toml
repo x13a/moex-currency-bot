@@ -2,8 +2,10 @@
 Polling = true
 PollingTimeout = 10
 Private = true
-ChatIds = []
-UpdateInterval = 60
+ChatIDs = []
+HttpTimeout = 10
+RatesUpdateInterval = 60
+MoexIssUpdateInterval = 300
 WelcomeMsg = "Welcome!"
 
 [bot.webhook]
