@@ -67,15 +67,15 @@ func runBot(
 	cmds := []tele.Command{
 		{
 			Text:        CmdGet[1:],
-			Description: "Get Rates",
+			Description: "Rates",
 		},
 		{
 			Text:        CmdGetConv[1:],
-			Description: "Get Rates Conv",
+			Description: "Rates Conv",
 		},
 		{
 			Text:        CmdValToday[1:],
-			Description: "Get Value Today",
+			Description: "Value Today",
 		},
 	}
 	if err = b.SetCommands(cmds); err != nil {
