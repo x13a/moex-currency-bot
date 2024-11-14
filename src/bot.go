@@ -186,6 +186,13 @@ func getHandler(db *Database, cmd string) tele.HandlerFunc {
 			return c.Send(s)
 		}
 
+		decimalToString := func(d *decimal.Decimal) string {
+			s := d.StringFixed(RateDP)
+			s = strings.TrimRight(s, "0")
+			s = strings.TrimSuffix(s, ".")
+			return s
+		}
+
 		type Result struct {
 			ticker string
 			bid    string
@@ -199,11 +206,13 @@ func getHandler(db *Database, cmd string) tele.HandlerFunc {
 		askWidth := 0
 		conv := cmd == CmdGetConv
 		for k, v := range rates {
+			isByn := false
 			hasNominal := v.Nominal.GreaterThan(decimal.NewFromFloat(1.0))
 			if conv && !hasNominal {
+				isByn = strings.HasPrefix(k, "BYN")
 				switch {
 				case strings.HasPrefix(k, "TRY"):
-				case strings.HasPrefix(k, "BYN"):
+				case isByn:
 					v.Nominal = decimal.NewFromFloat(100.0)
 				default:
 					continue
@@ -215,9 +224,7 @@ func getHandler(db *Database, cmd string) tele.HandlerFunc {
 					bid := v.Nominal.Div(*v.Bid)
 					v.Bid = &bid
 				}
-				bid = v.Bid.StringFixed(RateDP)
-				bid = strings.TrimRight(bid, "0")
-				bid = strings.TrimSuffix(bid, ".")
+				bid = decimalToString(v.Bid)
 			}
 			ask := ""
 			if v.Ask != nil {
@@ -225,9 +232,7 @@ func getHandler(db *Database, cmd string) tele.HandlerFunc {
 					ask := v.Nominal.Div(*v.Ask)
 					v.Ask = &ask
 				}
-				ask = v.Ask.StringFixed(RateDP)
-				ask = strings.TrimRight(ask, "0")
-				ask = strings.TrimSuffix(ask, ".")
+				ask = decimalToString(v.Ask)
 			}
 			if bid == "" && ask == "" {
 				continue
@@ -236,6 +241,9 @@ func getHandler(db *Database, cmd string) tele.HandlerFunc {
 			askWidth = max(len(ask), askWidth)
 			if conv {
 				bid, ask = ask, bid
+				if isByn {
+					k += "*"
+				}
 			} else if hasNominal {
 				k += "*"
 			}
