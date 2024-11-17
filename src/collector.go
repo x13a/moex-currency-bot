@@ -150,6 +150,9 @@ func collectMoexIss(ctx context.Context, client *http.Client, db *Database) {
 	)
 
 	rates := db.Data.GetRates()
+	if len(rates) == 0 {
+		return
+	}
 	var buf strings.Builder
 	for k := range rates {
 		buf.WriteString(k)

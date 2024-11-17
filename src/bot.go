@@ -88,7 +88,7 @@ func runBot(
 	b.Handle("/help", func(c tele.Context) error {
 		var buf strings.Builder
 		for _, cmd := range cmds {
-			buf.WriteString(fmt.Sprintf("/%s - %s\n", cmd.Text, cmd.Description))
+			fmt.Fprintf(&buf, "/%s - %s\n", cmd.Text, cmd.Description)
 		}
 		return c.Send(buf.String())
 	})
@@ -167,7 +167,7 @@ func valTodayHandler(db *Database) tele.HandlerFunc {
 		})
 		var buf strings.Builder
 		for _, v := range arrRes {
-			buf.WriteString(fmt.Sprintf("%-*s | %s\n", width, v.valToday, v.ticker))
+			fmt.Fprintf(&buf, "%-*s | %s\n", width, v.valToday, v.ticker)
 		}
 		s = strings.TrimSuffix(buf.String(), "\n")
 		if len(s) == 0 {
@@ -263,7 +263,7 @@ func getHandler(db *Database, cmd string) tele.HandlerFunc {
 		}
 		var buf strings.Builder
 		for _, v := range arrRes {
-			buf.WriteString(fmt.Sprintf("%-*s | %-*s | %s\n", bidWidth, v.bid, askWidth, v.ask, v.ticker))
+			fmt.Fprintf(&buf, "%-*s | %-*s | %s\n", bidWidth, v.bid, askWidth, v.ask, v.ticker)
 		}
 		s = strings.TrimSuffix(buf.String(), "\n")
 		if len(s) == 0 {
