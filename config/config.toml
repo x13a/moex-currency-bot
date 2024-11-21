@@ -9,6 +9,6 @@ MoexIssUpdateInterval = 300
 WelcomeMsg = "Welcome!"
 
 [bot.webhook]
-Url = "https://<HOST>/moex-currency-bot/webhook/"
+Url = "https://<HOST>/moex-currency-bot/webhook"
 Port = 8000
 Cert = "./certs/cert.pem"
