@@ -170,11 +170,12 @@ func valTodayHandler(db *Database) tele.HandlerFunc {
 			fmt.Fprintf(&buf, "%-*s | %s\n", width, v.valToday, v.ticker)
 		}
 		s = strings.TrimSuffix(buf.String(), "\n")
-		if len(s) == 0 {
-			return c.Send(Dunno)
+		if len(s) != 0 {
+			s = codeInline(s)
+			db.Cache.Set(CmdValToday, s)
+		} else {
+			s = Dunno
 		}
-		s = codeInline(s)
-		db.Cache.Set(CmdValToday, s)
 		return c.Send(s)
 	}
 }
@@ -266,11 +267,12 @@ func getHandler(db *Database, cmd string) tele.HandlerFunc {
 			fmt.Fprintf(&buf, "%-*s | %-*s | %s\n", bidWidth, v.bid, askWidth, v.ask, v.ticker)
 		}
 		s = strings.TrimSuffix(buf.String(), "\n")
-		if len(s) == 0 {
-			return c.Send(Dunno)
+		if len(s) != 0 {
+			s = codeInline(s)
+			db.Cache.Set(cmd, s)
+		} else {
+			s = Dunno
 		}
-		s = codeInline(s)
-		db.Cache.Set(cmd, s)
 		return c.Send(s)
 	}
 }
