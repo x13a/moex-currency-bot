@@ -83,14 +83,14 @@ func runBot(
 	}
 	b.Use(PrivateMiddleware(cfg))
 	b.Handle("/start", func(c tele.Context) error {
-		return c.Send(cfg.Bot.WelcomeMsg)
+		return c.Send(html.EscapeString(cfg.Bot.WelcomeMsg))
 	})
 	b.Handle("/help", func(c tele.Context) error {
 		var buf strings.Builder
 		for _, cmd := range cmds {
 			fmt.Fprintf(&buf, "/%s - %s\n", cmd.Text, cmd.Description)
 		}
-		return c.Send(buf.String())
+		return c.Send(html.EscapeString(buf.String()))
 	})
 	b.Handle("/id", func(c tele.Context) error {
 		chatID := int64(0)
