@@ -67,8 +67,8 @@ func (c *Cache) Get(key string) (string, bool) {
 func (c *Cache) ClearGet() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	delete(c.data, CmdGet)
-	delete(c.data, CmdGetConv)
+	delete(c.data, CmdRates)
+	delete(c.data, CmdRatesConv)
 }
 
 func (c *Cache) ClearValToday() {

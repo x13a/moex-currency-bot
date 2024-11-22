@@ -23,9 +23,9 @@ const (
 	RateDP      = 4
 	Dunno       = `¯\_(ツ)_/¯`
 
-	CmdGet      = "/get"
-	CmdGetConv  = "/getconv"
-	CmdValToday = "/valtoday"
+	CmdRates     = "/rates"
+	CmdRatesConv = "/ratesconv"
+	CmdValToday  = "/valtoday"
 )
 
 func mustGetEnvBotToken() string {
@@ -66,11 +66,11 @@ func runBot(
 	}
 	cmds := []tele.Command{
 		{
-			Text:        CmdGet[1:],
+			Text:        CmdRates[1:],
 			Description: "Rates",
 		},
 		{
-			Text:        CmdGetConv[1:],
+			Text:        CmdRatesConv[1:],
 			Description: "Rates Conv",
 		},
 		{
@@ -100,8 +100,8 @@ func runBot(
 		return c.Send(strconv.FormatInt(chatID, 10))
 	})
 	b.Handle(CmdValToday, valTodayHandler(db))
-	b.Handle(CmdGet, getHandler(db, CmdGet))
-	b.Handle(CmdGetConv, getHandler(db, CmdGetConv))
+	b.Handle(CmdRates, getHandler(db, CmdRates))
+	b.Handle(CmdRatesConv, getHandler(db, CmdRatesConv))
 	go b.Start()
 	defer b.Stop()
 	<-ctx.Done()
@@ -204,7 +204,7 @@ func getHandler(db *Database, cmd string) tele.HandlerFunc {
 		idx := 0
 		bidWidth := 0
 		askWidth := 0
-		conv := cmd == CmdGetConv
+		conv := cmd == CmdRatesConv
 		for k, v := range rates {
 			isByn := false
 			hasNominal := v.Nominal.GreaterThan(decimal.NewFromFloat(1.0))
