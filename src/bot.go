@@ -63,6 +63,26 @@ func runBot(
 	if err != nil {
 		log.Fatal(err)
 	}
+	if cfg.Bot.Polling {
+		wh, err := b.Webhook()
+		if err != nil {
+			log.Fatal(err)
+		}
+		if wh.Listen != "" {
+			if err = b.RemoveWebhook(false); err != nil {
+				log.Fatal(err)
+			}
+		}
+	}
+	if err = b.SetMyName(cfg.Bot.Name, ""); err != nil {
+		log.Println(err)
+	}
+	if err = b.SetMyShortDescription(cfg.Bot.About, ""); err != nil {
+		log.Println(err)
+	}
+	if err = b.SetMyDescription(cfg.Bot.Description, ""); err != nil {
+		log.Println(err)
+	}
 	cmds := []tele.Command{
 		{
 			Text:        CmdRates[1:],

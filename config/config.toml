@@ -8,6 +8,15 @@ RatesUpdateInterval = 60
 MoexIssUpdateInterval = 300
 WelcomeMsg = "Welcome!"
 
+Name = "Rate MOEX [🇷🇺]"
+About = "MOEX Currency Exchange Rates"
+Description = """
+MOEX Currency Exchange Rates
+
+Try these:
+/rates - Get Rates
+/ratesconv - Get Rates Conv"""
+
 [bot.webhook]
 Url = "https://<HOST>/moex-currency-bot/webhook"
 Port = 8000

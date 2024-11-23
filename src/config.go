@@ -20,7 +20,12 @@ type Config struct {
 		RatesUpdateInterval   time.Duration
 		MoexIssUpdateInterval time.Duration
 		WelcomeMsg            string
-		Webhook               struct {
+
+		Name        string
+		About       string
+		Description string
+
+		Webhook struct {
 			Url  string
 			Port uint16
 			Cert string
