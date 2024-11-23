@@ -14,8 +14,8 @@ Description = """
 MOEX Currency Exchange Rates
 
 Try these:
-/rates - Get Rates
-/ratesconv - Get Rates Conv"""
+/rates - Rates
+/ratesconv - Rates Conv"""
 
 [bot.webhook]
 Url = "https://<HOST>/moex-currency-bot/webhook"
