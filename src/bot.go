@@ -20,7 +20,6 @@ import (
 
 const (
 	EnvBotToken = "BOT_TOKEN"
-	RateDP      = 4
 	Dunno       = `¯\_(ツ)_/¯`
 
 	CmdRates     = "/rates"
@@ -85,23 +84,11 @@ func runBot(
 	b.Handle("/start", func(c tele.Context) error {
 		return c.Send(html.EscapeString(cfg.Bot.WelcomeMsg))
 	})
-	b.Handle("/help", func(c tele.Context) error {
-		var buf strings.Builder
-		for _, cmd := range cmds {
-			fmt.Fprintf(&buf, "/%s - %s\n", cmd.Text, cmd.Description)
-		}
-		return c.Send(html.EscapeString(buf.String()))
-	})
-	b.Handle("/id", func(c tele.Context) error {
-		chatID := int64(0)
-		if chat := c.Chat(); chat != nil {
-			chatID = chat.ID
-		}
-		return c.Send(strconv.FormatInt(chatID, 10))
-	})
+	b.Handle("/help", helpHandler(cmds))
+	b.Handle("/id", idHandler)
 	b.Handle(CmdValToday, valTodayHandler(db))
-	b.Handle(CmdRates, getHandler(db, CmdRates))
-	b.Handle(CmdRatesConv, getHandler(db, CmdRatesConv))
+	b.Handle(CmdRates, getHandler(db, cfg, CmdRates))
+	b.Handle(CmdRatesConv, getHandler(db, cfg, CmdRatesConv))
 	go b.Start()
 	defer b.Stop()
 	<-ctx.Done()
@@ -131,6 +118,24 @@ func PrivateMiddleware(cfg *Config) tele.MiddlewareFunc {
 			return nil
 		}
 	}
+}
+
+func helpHandler(cmds []tele.Command) tele.HandlerFunc {
+	return func(c tele.Context) error {
+		var buf strings.Builder
+		for _, cmd := range cmds {
+			fmt.Fprintf(&buf, "/%s - %s\n", cmd.Text, cmd.Description)
+		}
+		return c.Send(html.EscapeString(buf.String()))
+	}
+}
+
+func idHandler(c tele.Context) error {
+	chatID := int64(0)
+	if chat := c.Chat(); chat != nil {
+		chatID = chat.ID
+	}
+	return c.Send(strconv.FormatInt(chatID, 10))
 }
 
 func valTodayHandler(db *Database) tele.HandlerFunc {
@@ -180,7 +185,7 @@ func valTodayHandler(db *Database) tele.HandlerFunc {
 	}
 }
 
-func getHandler(db *Database, cmd string) tele.HandlerFunc {
+func getHandler(db *Database, cfg *Config, cmd string) tele.HandlerFunc {
 	return func(c tele.Context) error {
 		s, ok := db.Cache.Get(cmd)
 		if ok {
@@ -188,7 +193,7 @@ func getHandler(db *Database, cmd string) tele.HandlerFunc {
 		}
 
 		decimalToString := func(d *decimal.Decimal) string {
-			s := d.StringFixed(RateDP)
+			s := d.StringFixed(cfg.Gen.RateDP)
 			s = strings.TrimRight(s, "0")
 			s = strings.TrimSuffix(s, ".")
 			return s

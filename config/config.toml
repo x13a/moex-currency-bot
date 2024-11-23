@@ -12,3 +12,6 @@ WelcomeMsg = "Welcome!"
 Url = "https://<HOST>/moex-currency-bot/webhook"
 Port = 8000
 Cert = "./certs/cert.pem"
+
+[gen]
+RateDP = 4

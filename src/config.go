@@ -26,6 +26,9 @@ type Config struct {
 			Cert string
 		}
 	}
+	Gen struct {
+		RateDP int32
+	}
 }
 
 func mustLoadConfig() *Config {
