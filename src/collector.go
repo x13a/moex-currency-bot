@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -17,43 +18,69 @@ import (
 	pb "github.com/tinkoff/invest-api-go-sdk/proto"
 )
 
-const (
-	EnvTinkoffToken = "TINKOFF_TOKEN"
-	MoexIssUrl      = "https://iss.moex.com/iss/engines/currency/markets/selt/boards/CETS/securities.json"
-)
+const EnvTinkoffToken = "TINKOFF_TOKEN"
 
 func toDecimal(units int64, nano int32) decimal.Decimal {
 	return decimal.RequireFromString(fmt.Sprintf("%d.%d", units, nano))
 }
 
-func mustGetEnvTinkoffToken() string {
+func getEnvTinkoffToken() string {
 	token := os.Getenv(EnvTinkoffToken)
-	if token == "" {
-		log.Fatal("empty tinkoff token")
-	}
 	_ = os.Unsetenv(EnvTinkoffToken)
 	return token
 }
 
-func newClient(ctx context.Context) *investgo.Client {
+func newClient(ctx context.Context) (*investgo.Client, error) {
+	token := getEnvTinkoffToken()
+	if token == "" {
+		return nil, errors.New("tinkoff token is required")
+	}
 	tinkoffConfig := investgo.Config{
-		Token: mustGetEnvTinkoffToken(),
+		Token: token,
 	}
 	logger := &Logger{}
 	client, err := investgo.NewClient(ctx, tinkoffConfig, logger)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	return client
+	return client, nil
 }
 
-type Rate struct {
+type OrderBook struct {
 	Nominal decimal.Decimal
-	Bid     *decimal.Decimal
-	Ask     *decimal.Decimal
+	Bids    []Order
+	Asks    []Order
 }
 
-type MoexInstrument struct {
+func (b *OrderBook) Copy() OrderBook {
+	bids := make([]Order, len(b.Bids))
+	for i, bid := range b.Bids {
+		bids[i] = bid.Copy()
+	}
+	asks := make([]Order, len(b.Asks))
+	for i, ask := range b.Asks {
+		asks[i] = ask.Copy()
+	}
+	return OrderBook{
+		Nominal: b.Nominal.Copy(),
+		Bids:    bids,
+		Asks:    asks,
+	}
+}
+
+type Order struct {
+	Price    decimal.Decimal
+	Quantity int64
+}
+
+func (o *Order) Copy() Order {
+	return Order{
+		Price:    o.Price.Copy(),
+		Quantity: o.Quantity,
+	}
+}
+
+type Instrument struct {
 	ValToday float64
 }
 
@@ -62,50 +89,60 @@ func collectMoexIssLoop(
 	wg *sync.WaitGroup,
 	db *Database,
 	cfg *Config,
-	waitChan <-chan struct{},
+	syncChan <-chan struct{},
 ) {
 	defer wg.Done()
 	client := &http.Client{Timeout: cfg.Bot.HttpTimeout * time.Second}
-	<-waitChan
+	<-syncChan
 	for {
-		collectMoexIss(ctx, client, db)
+		collectMoexIss(ctx, client, db, cfg)
 		select {
 		case <-time.After(cfg.Bot.MoexIssUpdateInterval * time.Second):
 		case <-ctx.Done():
 			return
 		}
 	}
-
 }
 
-func collectRatesLoop(
+func collectOrderBookLoop(
 	ctx context.Context,
 	wg *sync.WaitGroup,
 	db *Database,
 	cfg *Config,
-	waitChan chan<- struct{},
+	syncChan chan<- struct{},
 ) {
 	defer wg.Done()
-	client := newClient(ctx)
+	client, err := newClient(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
 	defer client.Stop()
 	instClient := client.NewInstrumentsServiceClient()
 	mdClient := client.NewMarketDataServiceClient()
-	collectRates(instClient, mdClient, db)
-	close(waitChan)
+	collectOrderBook(instClient, mdClient, db, cfg)
+	close(syncChan)
 	for {
 		select {
-		case <-time.After(cfg.Bot.RatesUpdateInterval * time.Second):
-			collectRates(instClient, mdClient, db)
+		case <-time.After(cfg.Bot.OrderBookUpdateInterval * time.Second):
+			collectOrderBook(instClient, mdClient, db, cfg)
 		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-func collectRates(
+func newOrderFromProtoOrder(o *pb.Order) Order {
+	return Order{
+		Price:    toDecimal(o.Price.Units, o.Price.Nano),
+		Quantity: o.Quantity,
+	}
+}
+
+func collectOrderBook(
 	instClient *investgo.InstrumentsServiceClient,
 	mdClient *investgo.MarketDataServiceClient,
 	db *Database,
+	cfg *Config,
 ) {
 	currencies, err := instClient.Currencies(pb.InstrumentStatus_INSTRUMENT_STATUS_ALL)
 	if err != nil {
@@ -117,49 +154,48 @@ func collectRates(
 		if currency.TradingStatus != pb.SecurityTradingStatus_SECURITY_TRADING_STATUS_NORMAL_TRADING {
 			continue
 		}
-		orderBook, err := mdClient.GetOrderBook(currency.Figi, 1)
+		orderBook, err := mdClient.GetOrderBook(currency.Figi, cfg.OrderBookDepth)
 		if err != nil {
 			log.Println(err)
 			continue
 		}
-		rate := &Rate{
+		book := OrderBook{
 			Nominal: toDecimal(currency.Nominal.Units, currency.Nominal.Nano),
+			Bids:    make([]Order, len(orderBook.Bids)),
+			Asks:    make([]Order, len(orderBook.Asks)),
 		}
-		if len(orderBook.Bids) != 0 {
-			bid := orderBook.Bids[0]
-			bidDec := toDecimal(bid.Price.Units, bid.Price.Nano)
-			rate.Bid = &bidDec
+		for i, bid := range orderBook.Bids {
+			book.Bids[i] = newOrderFromProtoOrder(bid)
 		}
-		if len(orderBook.Asks) != 0 {
-			ask := orderBook.Asks[0]
-			askDec := toDecimal(ask.Price.Units, ask.Price.Nano)
-			rate.Ask = &askDec
+		for i, ask := range orderBook.Asks {
+			book.Asks[i] = newOrderFromProtoOrder(ask)
 		}
-		db.Data.SetRate(currency.Ticker, *rate)
+		db.Data.SetOrderBook(currency.Ticker, book)
 		dbUpdated = true
 	}
 	if dbUpdated {
-		db.Cache.ClearGet()
+		db.Cache.ClearRates()
+		db.Cache.ClearOrderBook()
 	}
 }
 
-func collectMoexIss(ctx context.Context, client *http.Client, db *Database) {
+func collectMoexIss(ctx context.Context, client *http.Client, db *Database, cfg *Config) {
 	const (
 		ColSecID    = "SECID"
 		ColValToday = "VALTODAY"
 	)
 
-	rates := db.Data.GetRates()
-	if len(rates) == 0 {
+	tickers := db.Data.GetTickers()
+	if len(tickers) == 0 {
 		return
 	}
 	var buf strings.Builder
-	for k := range rates {
-		buf.WriteString(k)
+	for _, v := range tickers {
+		buf.WriteString(v)
 		buf.WriteString(",")
 	}
 	securities := buf.String()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, MoexIssUrl, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, cfg.MoexIssURL, nil)
 	if err != nil {
 		log.Println(err)
 		return
@@ -185,8 +221,8 @@ func collectMoexIss(ctx context.Context, client *http.Client, db *Database) {
 	}
 
 	type MarketData struct {
-		Columns []string        `json:"columns"`
-		Data    [][]interface{} `json:"data"`
+		Columns []string `json:"columns"`
+		Data    [][]any  `json:"data"`
 	}
 
 	type MarketDataResponse struct {
@@ -200,16 +236,16 @@ func collectMoexIss(ctx context.Context, client *http.Client, db *Database) {
 	}
 	for _, data := range mdr.MarketData.Data {
 		secID := ""
-		mi := MoexInstrument{}
+		inst := Instrument{}
 		for idx, col := range mdr.MarketData.Columns {
 			switch col {
 			case ColSecID:
 				secID = data[idx].(string)
 			case ColValToday:
-				mi.ValToday = data[idx].(float64)
+				inst.ValToday = data[idx].(float64)
 			}
 		}
-		db.Data.SetInstrument(secID, mi)
+		db.Data.SetInstrument(secID, inst)
 	}
 	db.Cache.ClearValToday()
 }

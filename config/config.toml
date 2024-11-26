@@ -1,10 +1,15 @@
+MoexIssURL = "https://iss.moex.com/iss/engines/currency/markets/selt/boards/CETS/securities.json"
+OrderBookDepth = 10
+RateDP = 4
+ConvNominalBYN = 100.0
+
 [bot]
 Polling = true
 PollingTimeout = 10
 Private = true
 ChatIDs = []
 HttpTimeout = 10
-RatesUpdateInterval = 60
+OrderBookUpdateInterval = 60
 MoexIssUpdateInterval = 300
 WelcomeMsg = "Welcome!"
 
@@ -21,6 +26,3 @@ Try these:
 Url = "https://<HOST>/moex-currency-bot/webhook"
 Port = 8000
 Cert = "./certs/cert.pem"
-
-[gen]
-RateDP = 4

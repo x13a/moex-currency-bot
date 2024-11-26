@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"html"
 	"log"
@@ -22,29 +23,49 @@ const (
 	EnvBotToken = "BOT_TOKEN"
 	Dunno       = `¯\_(ツ)_/¯`
 
-	CmdRates     = "/rates"
-	CmdRatesConv = "/ratesconv"
-	CmdValToday  = "/valtoday"
+	CmdRates         = "/rates"
+	CmdRatesConv     = "/ratesconv"
+	CmdOrderBook     = "/orderbook"
+	CmdOrderBookConv = "/orderbookconv"
+	CmdValToday      = "/valtoday"
 )
 
-func mustGetEnvBotToken() string {
+var Commands = []tele.Command{
+	{
+		Text:        CmdRates[1:],
+		Description: "rates",
+	},
+	{
+		Text:        CmdRatesConv[1:],
+		Description: "rates conv",
+	},
+	{
+		Text:        CmdOrderBook[1:],
+		Description: "<TICKER> order book",
+	},
+	{
+		Text:        CmdOrderBookConv[1:],
+		Description: "<TICKER> order book conv",
+	},
+	{
+		Text:        CmdValToday[1:],
+		Description: "value today",
+	},
+}
+
+func getEnvBotToken() string {
 	token := os.Getenv(EnvBotToken)
-	if token == "" {
-		log.Fatal("empty bot token")
-	}
 	_ = os.Unsetenv(EnvBotToken)
 	return token
 }
 
-func runBot(
-	ctx context.Context,
-	wg *sync.WaitGroup,
-	db *Database,
-	cfg *Config,
-) {
-	defer wg.Done()
+func newBot(cfg *Config) (*tele.Bot, error) {
+	token := getEnvBotToken()
+	if token == "" {
+		return nil, errors.New("bot token is required")
+	}
 	pref := tele.Settings{
-		Token:     mustGetEnvBotToken(),
+		Token:     token,
 		ParseMode: tele.ModeHTML,
 	}
 	if cfg.Bot.Polling {
@@ -61,17 +82,36 @@ func runBot(
 	}
 	b, err := tele.NewBot(pref)
 	if err != nil {
+		return nil, err
+	}
+	return b, nil
+}
+
+func removeWebhook(b *tele.Bot) error {
+	wh, err := b.Webhook()
+	if err != nil {
+		return err
+	}
+	if wh.Listen != "" {
+		return b.RemoveWebhook(false)
+	}
+	return nil
+}
+
+func runBot(
+	ctx context.Context,
+	wg *sync.WaitGroup,
+	db *Database,
+	cfg *Config,
+) {
+	defer wg.Done()
+	b, err := newBot(cfg)
+	if err != nil {
 		log.Fatal(err)
 	}
 	if cfg.Bot.Polling {
-		wh, err := b.Webhook()
-		if err != nil {
+		if err = removeWebhook(b); err != nil {
 			log.Fatal(err)
-		}
-		if wh.Listen != "" {
-			if err = b.RemoveWebhook(false); err != nil {
-				log.Fatal(err)
-			}
 		}
 	}
 	if err = b.SetMyName(cfg.Bot.Name, ""); err != nil {
@@ -83,32 +123,18 @@ func runBot(
 	if err = b.SetMyDescription(cfg.Bot.Description, ""); err != nil {
 		log.Println(err)
 	}
-	cmds := []tele.Command{
-		{
-			Text:        CmdRates[1:],
-			Description: "Rates",
-		},
-		{
-			Text:        CmdRatesConv[1:],
-			Description: "Rates Conv",
-		},
-		{
-			Text:        CmdValToday[1:],
-			Description: "Value Today",
-		},
-	}
-	if err = b.SetCommands(cmds); err != nil {
+	if err = b.SetCommands(Commands); err != nil {
 		log.Println(err)
 	}
 	b.Use(PrivateMiddleware(cfg))
-	b.Handle("/start", func(c tele.Context) error {
-		return c.Send(html.EscapeString(cfg.Bot.WelcomeMsg))
-	})
-	b.Handle("/help", helpHandler(cmds))
+	b.Handle("/start", startHandler(db, cfg))
+	b.Handle("/help", helpHandler(Commands))
 	b.Handle("/id", idHandler)
+	b.Handle(CmdRates, ratesHandler(db, cfg, CmdRates))
+	b.Handle(CmdRatesConv, ratesHandler(db, cfg, CmdRatesConv))
 	b.Handle(CmdValToday, valTodayHandler(db))
-	b.Handle(CmdRates, getHandler(db, cfg, CmdRates))
-	b.Handle(CmdRatesConv, getHandler(db, cfg, CmdRatesConv))
+	b.Handle(CmdOrderBook, orderBookHandler(db, cfg, CmdOrderBook))
+	b.Handle(CmdOrderBookConv, orderBookHandler(db, cfg, CmdOrderBookConv))
 	go b.Start()
 	defer b.Stop()
 	<-ctx.Done()
@@ -158,6 +184,22 @@ func idHandler(c tele.Context) error {
 	return c.Send(strconv.FormatInt(chatID, 10))
 }
 
+func startHandler(db *Database, cfg *Config) tele.HandlerFunc {
+	return func(c tele.Context) error {
+		if msg := c.Message(); msg != nil {
+			switch msg.Payload {
+			case CmdRates[1:]:
+				return ratesHandler(db, cfg, CmdRates)(c)
+			case CmdRatesConv[1:]:
+				return ratesHandler(db, cfg, CmdRatesConv)(c)
+			case CmdValToday[1:]:
+				return valTodayHandler(db)(c)
+			}
+		}
+		return c.Send(html.EscapeString(cfg.Bot.WelcomeMsg))
+	}
+}
+
 func valTodayHandler(db *Database) tele.HandlerFunc {
 	return func(c tele.Context) error {
 		s, ok := db.Cache.Get(CmdValToday)
@@ -195,7 +237,7 @@ func valTodayHandler(db *Database) tele.HandlerFunc {
 			fmt.Fprintf(&buf, "%-*s | %s\n", width, v.valToday, v.ticker)
 		}
 		s = strings.TrimSuffix(buf.String(), "\n")
-		if len(s) != 0 {
+		if s != "" {
 			s = codeInline(s)
 			db.Cache.Set(CmdValToday, s)
 		} else {
@@ -205,18 +247,11 @@ func valTodayHandler(db *Database) tele.HandlerFunc {
 	}
 }
 
-func getHandler(db *Database, cfg *Config, cmd string) tele.HandlerFunc {
+func ratesHandler(db *Database, cfg *Config, cmd string) tele.HandlerFunc {
 	return func(c tele.Context) error {
 		s, ok := db.Cache.Get(cmd)
 		if ok {
 			return c.Send(s)
-		}
-
-		decimalToString := func(d *decimal.Decimal) string {
-			s := d.StringFixed(cfg.Gen.RateDP)
-			s = strings.TrimRight(s, "0")
-			s = strings.TrimSuffix(s, ".")
-			return s
 		}
 
 		type Result struct {
@@ -225,13 +260,13 @@ func getHandler(db *Database, cfg *Config, cmd string) tele.HandlerFunc {
 			ask    string
 		}
 
-		rates := db.Data.GetRates()
-		arrRes := make([]Result, len(rates))
+		books := db.Data.GetOrderBooks()
+		arrRes := make([]Result, len(books))
 		idx := 0
 		bidWidth := 0
 		askWidth := 0
 		conv := cmd == CmdRatesConv
-		for k, v := range rates {
+		for k, v := range books {
 			isByn := false
 			hasNominal := v.Nominal.GreaterThan(decimal.NewFromFloat(1.0))
 			if conv && !hasNominal {
@@ -239,26 +274,26 @@ func getHandler(db *Database, cfg *Config, cmd string) tele.HandlerFunc {
 				switch {
 				case strings.HasPrefix(k, "TRY"):
 				case isByn:
-					v.Nominal = decimal.NewFromFloat(100.0)
+					v.Nominal = decimal.NewFromFloat(cfg.ConvNominalBYN)
 				default:
 					continue
 				}
 			}
 			bid := ""
-			if v.Bid != nil {
+			if len(v.Bids) != 0 {
+				d := v.Bids[0].Price
 				if conv {
-					bid := v.Nominal.Div(*v.Bid)
-					v.Bid = &bid
+					d = v.Nominal.Div(d)
 				}
-				bid = decimalToString(v.Bid)
+				bid = decimalToString(d, cfg.RateDP)
 			}
 			ask := ""
-			if v.Ask != nil {
+			if len(v.Asks) != 0 {
+				d := v.Asks[0].Price
 				if conv {
-					ask := v.Nominal.Div(*v.Ask)
-					v.Ask = &ask
+					d = v.Nominal.Div(d)
 				}
-				ask = decimalToString(v.Ask)
+				ask = decimalToString(d, cfg.RateDP)
 			}
 			if bid == "" && ask == "" {
 				continue
@@ -292,7 +327,7 @@ func getHandler(db *Database, cfg *Config, cmd string) tele.HandlerFunc {
 			fmt.Fprintf(&buf, "%-*s | %-*s | %s\n", bidWidth, v.bid, askWidth, v.ask, v.ticker)
 		}
 		s = strings.TrimSuffix(buf.String(), "\n")
-		if len(s) != 0 {
+		if s != "" {
 			s = codeInline(s)
 			db.Cache.Set(cmd, s)
 		} else {
@@ -320,4 +355,84 @@ func formatFloat64(f float64) string {
 		}
 	}
 	return string(res)
+}
+
+func decimalToString(d decimal.Decimal, places int32) string {
+	s := d.StringFixed(places)
+	s = strings.TrimRight(s, "0")
+	s = strings.TrimSuffix(s, ".")
+	return s
+}
+
+func orderBookHandler(db *Database, cfg *Config, cmd string) tele.HandlerFunc {
+	return func(c tele.Context) error {
+		args := c.Args()
+		if len(args) == 0 {
+			return c.Send(Dunno)
+		}
+		ticker := args[0]
+		s, ok := db.Cache.GetOrderBook(cmd, ticker)
+		if ok {
+			return c.Send(s)
+		}
+		book, ok := db.Data.GetOrderBook(ticker)
+		if !ok || (len(book.Asks) == 0 && len(book.Bids) == 0) {
+			return c.Send(Dunno)
+		}
+		conv := cmd == CmdOrderBookConv
+		if conv && strings.HasPrefix(ticker, "BYN") {
+			book.Nominal = decimal.NewFromFloat(cfg.ConvNominalBYN)
+		}
+
+		type Result struct {
+			price    string
+			quantity string
+		}
+
+		res := make([]Result, len(book.Bids)+len(book.Asks)+1)
+		i := 0
+		width := 1
+		for j := len(book.Asks) - 1; j >= 0; j-- {
+			v := book.Asks[j]
+			quantity := strconv.FormatInt(v.Quantity, 10)
+			width = max(len(quantity), width)
+			if conv {
+				v.Price = book.Nominal.Div(v.Price)
+			}
+			res[i] = Result{
+				price:    decimalToString(v.Price, cfg.RateDP),
+				quantity: quantity,
+			}
+			i++
+		}
+		res[i] = Result{
+			price:    "-",
+			quantity: "-",
+		}
+		i++
+		for _, v := range book.Bids {
+			quantity := strconv.FormatInt(v.Quantity, 10)
+			width = max(len(quantity), width)
+			if conv {
+				v.Price = book.Nominal.Div(v.Price)
+			}
+			res[i] = Result{
+				price:    decimalToString(v.Price, cfg.RateDP),
+				quantity: quantity,
+			}
+			i++
+		}
+		var buf strings.Builder
+		for _, v := range res {
+			fmt.Fprintf(&buf, "%-*s | %s\n", width, v.quantity, v.price)
+		}
+		s = strings.TrimSuffix(buf.String(), "\n")
+		if s != "" {
+			s = codeInline(s)
+			db.Cache.SetOrderBook(cmd, ticker, s)
+		} else {
+			s = Dunno
+		}
+		return c.Send(s)
+	}
 }
