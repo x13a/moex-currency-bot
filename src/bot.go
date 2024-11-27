@@ -370,7 +370,7 @@ func orderBookHandler(db *Database, cfg *Config, cmd string) tele.HandlerFunc {
 		if len(args) == 0 {
 			return c.Send(Dunno)
 		}
-		ticker := args[0]
+		ticker := strings.ToUpper(args[0])
 		s, ok := db.Cache.GetOrderBook(cmd, ticker)
 		if ok {
 			return c.Send(s)
