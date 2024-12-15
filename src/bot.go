@@ -75,7 +75,7 @@ func newBot(cfg *Config) (*tele.Bot, error) {
 			Listen:      fmt.Sprintf("0.0.0.0:%d", cfg.Bot.Webhook.Port),
 			SecretToken: uuid.New().String(),
 			Endpoint: &tele.WebhookEndpoint{
-				PublicURL: cfg.Bot.Webhook.Url,
+				PublicURL: cfg.Bot.Webhook.URL,
 				Cert:      cfg.Bot.Webhook.Cert,
 			},
 		}

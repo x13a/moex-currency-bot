@@ -9,10 +9,11 @@ PollingTimeout = 10
 Private = true
 ChatIDs = []
 HttpTimeout = 10
+
 OrderBookUpdateInterval = 60
 MoexIssUpdateInterval = 300
-WelcomeMsg = "Welcome!"
 
+WelcomeMsg = "Welcome!"
 Name = "Rate MOEX [🇷🇺]"
 About = "MOEX Currency Exchange Rates"
 Description = """
@@ -23,6 +24,6 @@ Try these:
 /ratesconv - Rates Conv"""
 
 [bot.webhook]
-Url = "https://<HOST>/moex-currency-bot/webhook"
+URL = "https://<HOST>/moex-currency-bot/webhook"
 Port = 8000
 Cert = "./certs/cert.pem"

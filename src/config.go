@@ -16,16 +16,17 @@ type Config struct {
 		Private                 bool
 		ChatIDs                 []int64
 		HttpTimeout             time.Duration
+
 		OrderBookUpdateInterval time.Duration
 		MoexIssUpdateInterval   time.Duration
-		WelcomeMsg              string
 
+		WelcomeMsg  string
 		Name        string
 		About       string
 		Description string
 
 		Webhook struct {
-			Url  string
+			URL  string
 			Port uint16
 			Cert string
 		}
