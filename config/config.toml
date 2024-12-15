@@ -24,6 +24,6 @@ Try these:
 /ratesconv - Rates Conv"""
 
 [bot.webhook]
-URL = "https://<HOST>/moex-currency-bot/webhook"
+URL = "https://<HOST>/tg/moex-currency-bot/webhook"
 Port = 8000
 Cert = "./certs/cert.pem"
