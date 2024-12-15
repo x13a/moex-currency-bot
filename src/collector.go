@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -21,7 +22,14 @@ import (
 const EnvTinkoffToken = "TINKOFF_TOKEN"
 
 func toDecimal(units int64, nano int32) decimal.Decimal {
-	return decimal.RequireFromString(fmt.Sprintf("%d.%d", units, nano))
+	s := strconv.FormatInt(units, 10)
+	if nano < 0 {
+		if units == 0 {
+			s = "-0"
+		}
+		nano = -nano
+	}
+	return decimal.RequireFromString(fmt.Sprintf("%s.%09d", s, nano))
 }
 
 func getEnvTinkoffToken() string {
