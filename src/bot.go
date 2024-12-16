@@ -30,28 +30,31 @@ const (
 	CmdValToday      = "/valtoday"
 )
 
-var Commands = []tele.Command{
-	{
-		Text:        CmdRates[1:],
-		Description: "rates",
-	},
-	{
-		Text:        CmdRatesConv[1:],
-		Description: "rates conv",
-	},
-	{
-		Text:        CmdOrderBook[1:],
-		Description: "<TICKER> order book",
-	},
-	{
-		Text:        CmdOrderBookConv[1:],
-		Description: "<TICKER> order book conv",
-	},
-	{
-		Text:        CmdValToday[1:],
-		Description: "value today",
-	},
-}
+var (
+	Commands = []tele.Command{
+		{
+			Text:        CmdRates[1:],
+			Description: "rates",
+		},
+		{
+			Text:        CmdRatesConv[1:],
+			Description: "rates conv",
+		},
+		{
+			Text:        CmdOrderBook[1:],
+			Description: "<TICKER> order book",
+		},
+		{
+			Text:        CmdOrderBookConv[1:],
+			Description: "<TICKER> order book conv",
+		},
+		{
+			Text:        CmdValToday[1:],
+			Description: "value today",
+		},
+	}
+	Error403 = errors.New("403 Forbidden")
+)
 
 func getEnvBotToken() string {
 	token := os.Getenv(EnvBotToken)
@@ -154,14 +157,10 @@ func PrivateMiddleware(cfg *Config) tele.MiddlewareFunc {
 			if chat == nil {
 				return nil
 			}
-			chatID := chat.ID
-			if chatID == 0 {
-				return nil
-			}
-			if slices.Contains(cfg.Bot.ChatIDs, chatID) {
+			if slices.Contains(cfg.Bot.ChatIDs, chat.ID) {
 				return next(c)
 			}
-			return nil
+			return Error403
 		}
 	}
 }
